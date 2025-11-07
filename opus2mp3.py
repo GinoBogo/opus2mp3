@@ -109,7 +109,7 @@ class ConversionThread(QThread):
             "-i",
             src_path,
             "-af",
-            "loudnorm=I=-16:LRA=11:TP=-1.5:print_format=json",
+            "loudnorm=I=-12:LRA=11:TP=-1.5:print_format=json",
             "-f",
             "null",
             "-",
@@ -131,7 +131,14 @@ class ConversionThread(QThread):
         Returns:
             list: A list of strings representing the FFmpeg command.
         """
-        loudnorm_params = f"loudnorm=I=-16:LRA=11:TP=-1.5:measured_I={loudnorm_stats['input_i']}:measured_LRA={loudnorm_stats['input_lra']}:measured_TP={loudnorm_stats['input_tp']}:measured_thresh={loudnorm_stats['input_thresh']}:offset={loudnorm_stats['target_offset']}"
+        loudnorm_params = (
+            f"loudnorm=I=-12:LRA=11:TP=-1.5:"
+            f"measured_I={loudnorm_stats['input_i']}:"
+            f"measured_LRA={loudnorm_stats['input_lra']}:"
+            f"measured_TP={loudnorm_stats['input_tp']}:"
+            f"measured_thresh={loudnorm_stats['input_thresh']}:"
+            f"offset={loudnorm_stats['target_offset']}"
+        )
 
         if loudnorm_stats["normalization_type"] == "dynamic":
             loudnorm_params += ":linear=true"
