@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Opus to MP3 Converter Application
 Author: Gino Bogo
