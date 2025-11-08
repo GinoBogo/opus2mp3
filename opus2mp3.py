@@ -440,7 +440,7 @@ class OpusToMp3Converter(QWidget):
         """Initializes the OpusToMp3Converter application window."""
         super().__init__()
         self.setWindowTitle("Opus to MP3 Converter")
-        self.setMinimumSize(600, 600)
+        self.setMinimumSize(600, 800)
         self.conversion_thread = None
         self._setup_ui()
         self._apply_styles()
@@ -509,14 +509,14 @@ class OpusToMp3Converter(QWidget):
 
     ############################################################################
 
-    def _setup_directory_controls(self, parent_layout):
+    def _setup_directory_controls(self, parent_layout: QVBoxLayout):
         """Sets up source and destination directory controls.
 
         Creates and arranges widgets for selecting source and destination
         directories.
 
         Args:
-            parent_layout (QLayout): The layout to which these controls will be
+            parent_layout (QVBoxLayout): The layout to which these controls will be
             added.
         """
         grid_layout = QGridLayout()
@@ -559,14 +559,14 @@ class OpusToMp3Converter(QWidget):
 
     ############################################################################
 
-    def _setup_file_table(self, parent_layout):
+    def _setup_file_table(self, parent_layout: QVBoxLayout):
         """Sets up the file table widget.
 
         Configures the table for displaying Opus files and their conversion
         status.
 
         Args:
-            parent_layout (QLayout): The layout to which the file table will be
+            parent_layout (QVBoxLayout): The layout to which the file table will be
             added.
         """
         self.file_table = QTableWidget()
@@ -579,64 +579,75 @@ class OpusToMp3Converter(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
 
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+
         parent_layout.addWidget(self.file_table)
 
     ############################################################################
 
-    def _setup_selection_buttons(self, parent_layout):
+    def _setup_selection_buttons(self, parent_layout: QVBoxLayout):
         """Sets up file selection buttons.
 
         Creates 'Select All' and 'Deselect All' buttons for managing file
         selections.
 
         Args:
-            parent_layout (QLayout): The layout to which these buttons will be
+            parent_layout (QVBoxLayout): The layout to which these buttons will be
             added.
         """
         select_layout = QHBoxLayout()
+
         self.select_all_button = QPushButton("Select All")
         self.select_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.select_all_button.clicked.connect(self.select_all)
+        self.select_all_button.setEnabled(False)
+
         self.deselect_all_button = QPushButton("Deselect All")
         self.deselect_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.deselect_all_button.clicked.connect(self.deselect_all)
+        self.deselect_all_button.setEnabled(False)
+
         select_layout.addWidget(self.select_all_button)
         select_layout.addWidget(self.deselect_all_button)
         parent_layout.addLayout(select_layout)
 
     ############################################################################
 
-    def _setup_action_buttons(self, parent_layout):
+    def _setup_action_buttons(self, parent_layout: QVBoxLayout):
         """Sets up conversion action buttons.
 
         Creates 'Convert' and 'Cancel' buttons for initiating and stopping
         conversions.
 
         Args:
-            parent_layout (QLayout): The layout to which these buttons will be
+            parent_layout (QVBoxLayout): The layout to which these buttons will be
             added.
         """
         button_layout = QHBoxLayout()
+
         self.convert_button = QPushButton("Convert")
         self.convert_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.convert_button.clicked.connect(self.start_conversion)
+        self.convert_button.setEnabled(False)
+
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cancel_button.clicked.connect(self.cancel_conversion)
         self.cancel_button.setEnabled(False)
+
         button_layout.addWidget(self.convert_button)
         button_layout.addWidget(self.cancel_button)
         parent_layout.addLayout(button_layout)
 
     ############################################################################
 
-    def _setup_progress_bar(self, parent_layout):
+    def _setup_progress_bar(self, parent_layout: QVBoxLayout):
         """Sets up the progress bar.
 
         Initializes the QProgressBar widget for displaying conversion progress.
 
         Args:
-            parent_layout (QLayout): The layout to which the progress bar will
+            parent_layout (QVBoxLayout): The layout to which the progress bar will
             be added.
         """
         self.progress_bar = QProgressBar()
@@ -644,19 +655,42 @@ class OpusToMp3Converter(QWidget):
 
     ############################################################################
 
-    def _setup_output_log(self, parent_layout):
+    def _setup_output_log(self, parent_layout: QVBoxLayout):
         """Sets up the output log.
 
         Initializes the QTextEdit widget for displaying conversion output and
         messages.
 
         Args:
-            parent_layout (QLayout): The layout to which the output log will be
+            parent_layout (QVBoxLayout): The layout to which the output log will be
             added.
         """
         self.output_log = QTextEdit()
         self.output_log.setReadOnly(True)
         parent_layout.addWidget(self.output_log)
+
+    ############################################################################
+
+    def _update_buttons_state(self):
+        """Updates the enabled state of the buttons based on file selection.
+
+        - 'Convert' is enabled only if at least one file is checked.
+        - 'Select All' and 'Deselect All' are enabled if there are any files in
+          the table.
+        """
+        has_files = self.file_table.rowCount() > 0
+        has_selected_files = False
+
+        if has_files:
+            for i in range(self.file_table.rowCount()):
+                item = self.file_table.item(i, 0)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    has_selected_files = True
+                    break
+
+        self.convert_button.setEnabled(has_selected_files)
+        self.select_all_button.setEnabled(has_files)
+        self.deselect_all_button.setEnabled(has_files)
 
     ############################################################################
 
@@ -785,12 +819,21 @@ class OpusToMp3Converter(QWidget):
             return
 
         src_dir = self.src_line_edit.text()
+
+        try:
+            self.file_table.itemChanged.disconnect(self._update_buttons_state)
+        except RuntimeError:
+            pass  # Ignore error if not connected
+
         self.file_table.setRowCount(0)
 
         opus_files = self._get_opus_files(src_dir)
 
         for i, opus_file in enumerate(opus_files):
             self._add_file_to_table(i, opus_file, src_dir)
+
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+        self._update_buttons_state()
 
         self.setEnabled(True)
 
@@ -839,10 +882,18 @@ class OpusToMp3Converter(QWidget):
             state (Qt.CheckState): The `Qt.CheckState` to apply (e.g.,
             `Qt.CheckState.Checked`).
         """
+        try:
+            self.file_table.itemChanged.disconnect(self._update_buttons_state)
+        except RuntimeError:
+            pass  # Ignore error if not connected
+
         for i in range(self.file_table.rowCount()):
             item = self.file_table.item(i, 0)
             if item is not None:
                 item.setCheckState(state)
+
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+        self._update_buttons_state()
 
     ############################################################################
 
