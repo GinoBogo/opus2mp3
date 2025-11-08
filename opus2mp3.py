@@ -732,7 +732,10 @@ class OpusToMp3Converter(QWidget):
         """
         dir_path = self.dest_line_edit.text()
         if not dir_path:
-            self.append_log(LogType.WARNING, "Destination directory not set.")
+            self.append_log(
+                LogType.WARNING,
+                "Destination directory not set. Please select a valid directory.",
+            )
             return
 
         try:
@@ -781,7 +784,10 @@ class OpusToMp3Converter(QWidget):
         """
         src_dir = self.src_line_edit.text()
         if not os.path.isdir(src_dir):
-            self.append_log(LogType.WARNING, "Source directory is not valid.")
+            self.append_log(
+                LogType.WARNING,
+                "Source directory not set. Please select a valid directory.",
+            )
             return False
         return True
 
