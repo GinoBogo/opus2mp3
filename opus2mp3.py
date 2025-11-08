@@ -715,6 +715,21 @@ class OpusToMp3Converter(QWidget):
         dir_path = self._get_existing_directory("Select Destination Directory")
         if dir_path:
             self.dest_line_edit.setText(dir_path)
+            try:
+                mp3_files = [f for f in os.listdir(dir_path) if f.endswith(".mp3")]
+                self.append_log(
+                    LogType.INFO,
+                    f"Found {len(mp3_files)} MP3 files in destination folder.",
+                )
+                if mp3_files:
+                    self.append_log(
+                        LogType.INFO,
+                        f"Found MP3 files: {', '.join(mp3_files)}",
+                    )
+            except FileNotFoundError:
+                self.append_log(
+                    LogType.ERROR, f"Destination directory not found: {dir_path}"
+                )
 
     ############################################################################
 
@@ -828,6 +843,8 @@ class OpusToMp3Converter(QWidget):
         self.file_table.setRowCount(0)
 
         opus_files = self._get_opus_files(src_dir)
+
+        self.append_log(LogType.INFO, f"Found {len(opus_files)} Opus files.")
 
         for i, opus_file in enumerate(opus_files):
             self._add_file_to_table(i, opus_file, src_dir)
