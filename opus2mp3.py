@@ -873,9 +873,9 @@ class OpusToMp3Converter(QWidget):
         self.src_button = QPushButton("Browse")
         self.src_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.src_button.clicked.connect(self.browse_source)
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.refresh_button.clicked.connect(self.refresh_files)
+        self.src_refresh_button = QPushButton("Refresh")
+        self.src_refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.src_refresh_button.clicked.connect(self.refresh_files)
 
         # Destination directory controls
         dest_label = QLabel("Destination:")
@@ -1433,9 +1433,10 @@ class OpusToMp3Converter(QWidget):
         widgets_to_toggle = [
             self.src_line_edit,
             self.src_button,
-            self.refresh_button,
+            self.src_refresh_button,
             self.dest_line_edit,
             self.dest_button,
+            self.dest_refresh_button,
             self.file_table,
             self.select_all_button,
             self.deselect_all_button,
