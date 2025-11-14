@@ -349,6 +349,14 @@ class OpusToMp3Converter(QWidget):
 
         self.setGeometry(x_pos, y_pos, width, height)
 
+        # Load column widths
+        if config.has_section("ColumnWidths"):
+            header = self.file_table.horizontalHeader()
+            for i in range(self.file_table.columnCount()):
+                width = config.getint("ColumnWidths", f"column_{i}_width", fallback=-1)
+                if width != -1:
+                    header.resizeSection(i, width)
+
     def _save_settings(self):
         """Saves current window settings to the configuration file."""
         config = configparser.ConfigParser()
@@ -362,6 +370,13 @@ class OpusToMp3Converter(QWidget):
         config["MainWindow"]["height"] = str(self.height())
         config["MainWindow"]["x_pos"] = str(self.x())
         config["MainWindow"]["y_pos"] = str(self.y())
+
+        # Save column widths
+        if "ColumnWidths" not in config:
+            config["ColumnWidths"] = {}
+        header = self.file_table.horizontalHeader()
+        for i in range(self.file_table.columnCount()):
+            config["ColumnWidths"][f"column_{i}_width"] = str(header.sectionSize(i))
 
         with open(CONFIG_FILE, "w") as config_file:
             config.write(config_file)
