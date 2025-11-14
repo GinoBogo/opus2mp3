@@ -130,17 +130,17 @@ class OpusToMp3Converter(QWidget):
                 padding: 5px;
             }
             QPushButton {
-                background-color: #0078d7;
-                color: #fff;
+                background-color: #FFD700;
+                color: #000;
                 border: none;
                 border-radius: 4px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
-                background-color: #005a9e;
+                background-color: #d9b600;
             }
             QPushButton:pressed {
-                background-color: #004578;
+                background-color: #b39500;
             }
             QPushButton:disabled {
                 background-color: #d3d3d3;
