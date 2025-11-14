@@ -78,778 +78,6 @@ class LogType(Enum):
 ################################################################################
 
 
-class OpusToMp3Converter(QWidget):
-    """Main application window for the Opus to MP3 Converter.
-
-    Provides the user interface for selecting files, managing conversions, and
-    displaying progress and output.
-    """
-
-    def __init__(self):
-        """Initializes the OpusToMp3Converter application window."""
-        super().__init__()
-        self.setWindowTitle("Opus to MP3 Converter")
-        self.setMinimumSize(600, 800)
-        self.conversion_thread = None
-        self._setup_ui()
-        self._apply_styles()
-        self._load_settings()
-
-    ############################################################################
-    # UI Setup Methods
-    ############################################################################
-
-    def _setup_ui(self):
-        """Initializes the user interface.
-
-        Sets up all the widgets and layouts for the main application window.
-        """
-        layout = QVBoxLayout(self)
-        self._setup_directory_controls(layout)
-        self._setup_file_table(layout)
-        self._setup_selection_buttons(layout)
-        self._setup_action_buttons(layout)
-        self._setup_output_log(layout)
-        self._setup_progress_bar(layout)
-
-    def _apply_styles(self):
-        """Applies CSS styles to the application.
-
-        Sets the stylesheet for the main application window.
-        """
-        self.setStyleSheet(
-            """
-            QWidget {
-                background-color: #f0f0f0;
-                color: #333;
-            }
-            QLineEdit, QTextEdit, QTableWidget {
-                background-color: #fff;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 5px;
-            }
-            QPushButton {
-                background-color: #0078d7;
-                color: #fff;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-            }
-            QPushButton:hover {
-                background-color: #005a9e;
-            }
-            QPushButton:pressed {
-                background-color: #004578;
-            }
-
-            QPushButton#convertButton,
-            QPushButton#cancelButton {
-                background-color: #FFD700;
-                color: #000;
-            }
-
-            QPushButton#convertButton:hover,
-            QPushButton#cancelButton:hover {
-                background-color: #d9b600;
-            }
-
-            QPushButton#convertButton:pressed,
-            QPushButton#cancelButton:pressed {
-                background-color: #b39500;
-            }
-
-            QPushButton:disabled,
-            QPushButton#convertButton:disabled,
-            QPushButton#cancelButton:disabled {
-                background-color: gray;
-                color: #f0f0f0;
-            }
-
-            QProgressBar {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #4CAF50;
-            }
-        """
-        )
-
-    def _setup_directory_controls(self, parent_layout: QVBoxLayout):
-        """Sets up source and destination directory controls.
-
-        Creates and arranges widgets for selecting source and destination
-        directories.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which these controls will be
-            added.
-        """
-        grid_layout = QGridLayout()
-
-        # Source directory controls
-        src_label = QLabel("Source:")
-        src_label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
-        self.src_line_edit = QLineEdit()
-        self.src_line_edit.setPlaceholderText("Source Directory")
-        self.src_button = QPushButton("Browse")
-        self.src_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.src_button.clicked.connect(self.browse_source)
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.refresh_button.clicked.connect(self.refresh_files)
-
-        # Destination directory controls
-        dest_label = QLabel("Destination:")
-        dest_label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
-        self.dest_line_edit = QLineEdit()
-        self.dest_line_edit.setPlaceholderText("Destination Directory")
-        self.dest_button = QPushButton("Browse")
-        self.dest_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.dest_button.clicked.connect(self.browse_destination)
-        self.dest_refresh_button = QPushButton("Refresh")
-        self.dest_refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.dest_refresh_button.clicked.connect(self.refresh_destination)
-
-        # Add widgets to grid
-        grid_layout.addWidget(src_label, 0, 0)
-        grid_layout.addWidget(self.src_line_edit, 0, 1)
-        grid_layout.addWidget(self.src_button, 0, 2)
-        grid_layout.addWidget(self.refresh_button, 0, 3)
-        grid_layout.addWidget(dest_label, 1, 0)
-        grid_layout.addWidget(self.dest_line_edit, 1, 1)
-        grid_layout.addWidget(self.dest_button, 1, 2)
-        grid_layout.addWidget(self.dest_refresh_button, 1, 3)
-
-        parent_layout.addLayout(grid_layout)
-
-    def _setup_file_table(self, parent_layout: QVBoxLayout):
-        """Sets up the file table widget.
-
-        Configures the table for displaying Opus files and their conversion
-        status.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which the file table will be
-            added.
-        """
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(3)
-        self.file_table.setHorizontalHeaderLabels(["Convert", "Filename", "Duration"])
-
-        # Configure header resize modes
-        header = self.file_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-
-        self.file_table.itemChanged.connect(self._update_buttons_state)
-
-        parent_layout.addWidget(self.file_table)
-
-    def _setup_selection_buttons(self, parent_layout: QVBoxLayout):
-        """Sets up file selection buttons.
-
-        Creates 'Select All' and 'Deselect All' buttons for managing file
-        selections.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which these buttons will be
-            added.
-        """
-        select_layout = QHBoxLayout()
-
-        self.select_all_button = QPushButton("Select All")
-        self.select_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.select_all_button.clicked.connect(self.select_all)
-        self.select_all_button.setEnabled(False)
-
-        self.deselect_all_button = QPushButton("Deselect All")
-        self.deselect_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.deselect_all_button.clicked.connect(self.deselect_all)
-        self.deselect_all_button.setEnabled(False)
-
-        select_layout.addWidget(self.select_all_button)
-        select_layout.addWidget(self.deselect_all_button)
-        parent_layout.addLayout(select_layout)
-
-    def _setup_action_buttons(self, parent_layout: QVBoxLayout):
-        """Sets up conversion action buttons.
-
-        Creates 'Convert' and 'Cancel' buttons for initiating and stopping
-        conversions.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which these buttons will be
-            added.
-        """
-        button_layout = QHBoxLayout()
-
-        self.convert_button = QPushButton("Convert")
-        self.convert_button.setObjectName("convertButton")
-        self.convert_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.convert_button.clicked.connect(self.start_conversion)
-        self.convert_button.setEnabled(False)
-
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.setObjectName("cancelButton")
-        self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cancel_button.clicked.connect(self.cancel_conversion)
-        self.cancel_button.setEnabled(False)
-
-        button_layout.addWidget(self.convert_button)
-        button_layout.addWidget(self.cancel_button)
-        parent_layout.addLayout(button_layout)
-
-    def _setup_progress_bar(self, parent_layout: QVBoxLayout):
-        """Sets up the progress bar.
-
-        Initializes the QProgressBar widget for displaying conversion progress.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which the progress bar will
-            be added.
-        """
-        self.progress_bar = QProgressBar()
-        parent_layout.addWidget(self.progress_bar)
-
-    def _setup_output_log(self, parent_layout: QVBoxLayout):
-        """Sets up the output log.
-
-        Initializes the QTextEdit widget for displaying conversion output and
-        messages.
-
-        Args:
-            parent_layout (QVBoxLayout): The layout to which the output log will be
-            added.
-        """
-        self.output_log = QTextEdit()
-        self.output_log.setReadOnly(True)
-        parent_layout.addWidget(self.output_log)
-
-    ############################################################################
-    # Configuration Methods
-    ############################################################################
-
-    def _load_settings(self):
-        """Loads window settings from the configuration file."""
-        config = configparser.ConfigParser()
-        config.read(CONFIG_FILE)
-
-        width = config.getint("MainWindow", "width", fallback=800)
-        height = config.getint("MainWindow", "height", fallback=600)
-        x_pos = config.getint("MainWindow", "x_pos", fallback=100)
-        y_pos = config.getint("MainWindow", "y_pos", fallback=100)
-
-        self.setGeometry(x_pos, y_pos, width, height)
-
-        # Load column widths
-        if config.has_section("ColumnWidths"):
-            header = self.file_table.horizontalHeader()
-            for i in range(self.file_table.columnCount()):
-                width = config.getint("ColumnWidths", f"column_{i}_width", fallback=-1)
-                if width != -1:
-                    header.resizeSection(i, width)
-
-    def _save_settings(self):
-        """Saves current window settings to the configuration file."""
-        config = configparser.ConfigParser()
-        # Read existing config to preserve other sections if they exist
-        config.read(CONFIG_FILE)
-
-        if "MainWindow" not in config:
-            config["MainWindow"] = {}
-
-        config["MainWindow"]["width"] = str(self.width())
-        config["MainWindow"]["height"] = str(self.height())
-        config["MainWindow"]["x_pos"] = str(self.x())
-        config["MainWindow"]["y_pos"] = str(self.y())
-
-        # Save column widths
-        if "ColumnWidths" not in config:
-            config["ColumnWidths"] = {}
-        header = self.file_table.horizontalHeader()
-        for i in range(self.file_table.columnCount()):
-            config["ColumnWidths"][f"column_{i}_width"] = str(header.sectionSize(i))
-
-        with open(CONFIG_FILE, "w") as config_file:
-            config.write(config_file)
-
-    ############################################################################
-    # File Management Methods
-    ############################################################################
-
-    def _validate_source_directory(self):
-        """Validates that the source directory exists.
-
-        Checks if the path in `src_line_edit` points to an existing directory.
-
-        Returns:
-            bool: True if the source directory is valid, False otherwise.
-        """
-        src_dir = self.src_line_edit.text()
-        if not os.path.isdir(src_dir):
-            self.append_log(
-                LogType.WARNING,
-                "Source directory not set. Please select a valid directory.",
-            )
-            return False
-        return True
-
-    def _get_opus_files(self, src_dir):
-        """Gets a list of Opus files in the specified directory.
-
-        Scans the given source directory for files ending with '.opus'.
-
-        Args:
-            src_dir (str): The absolute path to the source directory.
-
-        Returns:
-            list: A list of Opus filenames found in the directory.
-        """
-        try:
-            return [f for f in os.listdir(src_dir) if f.endswith(".opus")]
-        except FileNotFoundError:
-            self.output_log.append(f"Source directory not found: {src_dir}")
-            return []
-
-    def _add_file_to_table(self, row, opus_file, src_dir):
-        """Adds a file to the file table.
-
-        Inserts a new row into the file table with a checkbox, filename, and
-        duration.
-
-        Args:
-            row (int): The row index where the file should be added. opus_file
-            (str): The filename of the Opus file. src_dir (str): The source
-            directory of the Opus file.
-        """
-        self.file_table.insertRow(row)
-
-        # Create checkbox item
-        check_item = QTableWidgetItem()
-        check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-        check_item.setCheckState(Qt.CheckState.Checked)
-
-        # Create filename item
-        file_item = QTableWidgetItem(opus_file)
-        file_item.setFlags(file_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
-        # Create duration item
-        duration_str = self.get_duration_str(os.path.join(src_dir, opus_file))
-        duration_item = QTableWidgetItem(duration_str)
-        duration_item.setFlags(duration_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
-        # Add items to table
-        self.file_table.setItem(row, 0, check_item)
-        self.file_table.setItem(row, 1, file_item)
-        self.file_table.setItem(row, 2, duration_item)
-
-    def get_duration_str(self, filepath):
-        """Gets the duration string for a media file using ffprobe.
-
-        Executes `ffprobe` to extract the duration of a given media file and
-        formats it as MM:SS.
-
-        Args:
-            filepath (str): The absolute path to the media file.
-
-        Returns:
-            str: A string representing the duration (MM:SS) or "--:--" if
-            duration cannot be determined.
-        """
-        command = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            filepath,
-        ]
-        try:
-            result = subprocess.run(command, capture_output=True, text=True, check=True)
-            duration = float(result.stdout.strip())
-            minutes = int(duration // 60)
-            seconds = int(duration % 60)
-            return f"{minutes:02d}:{seconds:02d}"
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return "--:--"
-
-    ############################################################################
-    # UI Interaction Methods
-    ############################################################################
-
-    def _get_existing_directory(self, title):
-        """Opens a directory dialog and returns the selected path.
-
-        Temporarily disables the main window while the dialog is open.
-
-        Args:
-            title (str): The title for the directory selection dialog.
-
-        Returns:
-            str: The absolute path of the selected directory, or an empty string
-            if cancelled.
-        """
-        self.setEnabled(False)
-        dir_path = QFileDialog.getExistingDirectory(self, title)
-        self.setEnabled(True)
-        return dir_path
-
-    def browse_source(self):
-        """Browses for the source directory.
-
-        Opens a directory selection dialog and updates the source path and file
-        list.
-        """
-        dir_path = self._get_existing_directory("Select Source Directory")
-        if dir_path:
-            self.src_line_edit.setText(dir_path)
-            self.refresh_files()
-
-    def browse_destination(self):
-        """Browsers for the destination directory.
-
-        Opens a directory selection dialog and updates the destination path.
-        """
-        dir_path = self._get_existing_directory("Select Destination Directory")
-        if dir_path:
-            self.dest_line_edit.setText(dir_path)
-            self.refresh_destination()
-
-    def refresh_destination(self):
-        """Refreshes the count of MP3 files in the destination directory.
-
-        Reads the current destination path and updates the log with the number
-        of MP3 files found, without opening a directory selection dialog.
-        """
-        dir_path = self.dest_line_edit.text()
-        if not dir_path:
-            self.append_log(
-                LogType.WARNING,
-                "Destination directory not set. Please select a valid directory.",
-            )
-            return
-
-        try:
-            mp3_files = [
-                f
-                for f in os.listdir(dir_path)
-                if f.endswith(".mp3") and not f.startswith(".")
-            ]
-            self.append_log(
-                LogType.INFO,
-                f"Found {len(mp3_files)} MP3 files in destination folder.",
-            )
-        except FileNotFoundError:
-            self.append_log(
-                LogType.ERROR, f"Destination directory not found: {dir_path}"
-            )
-
-    def refresh_files(self):
-        """Refreshes the list of Opus files in the source directory.
-
-        Clears the current file table and repopulates it with files from the
-        selected source directory.
-        """
-        self.setEnabled(False)
-
-        if not self._validate_source_directory():
-            self.setEnabled(True)
-            return
-
-        src_dir = self.src_line_edit.text()
-
-        try:
-            self.file_table.itemChanged.disconnect(self._update_buttons_state)
-        except RuntimeError:
-            pass  # Ignore error if not connected
-
-        self.file_table.setRowCount(0)
-
-        opus_files = self._get_opus_files(src_dir)
-
-        self.append_log(
-            LogType.INFO, f"Found {len(opus_files)} Opus files in source folder."
-        )
-
-        for i, opus_file in enumerate(opus_files):
-            self._add_file_to_table(i, opus_file, src_dir)
-
-        self.file_table.itemChanged.connect(self._update_buttons_state)
-        self._update_buttons_state()
-
-        self.setEnabled(True)
-
-    def _update_buttons_state(self):
-        """Updates the enabled state of the buttons based on file selection.
-
-        - 'Convert' is enabled only if at least one file is checked.
-        - 'Select All' and 'Deselect All' are enabled if there are any files in
-          the table.
-        """
-        has_files = self.file_table.rowCount() > 0
-        has_selected_files = False
-
-        if has_files:
-            for i in range(self.file_table.rowCount()):
-                item = self.file_table.item(i, 0)
-                if item and item.checkState() == Qt.CheckState.Checked:
-                    has_selected_files = True
-                    break
-
-        self.convert_button.setEnabled(has_selected_files)
-        self.select_all_button.setEnabled(has_files)
-        self.deselect_all_button.setEnabled(has_files)
-
-    def _set_table_check_state(self, state):
-        """Sets the check state for all files in the table.
-
-        Iterates through all rows in the file table and sets the checkbox state.
-
-        Args:
-            state (Qt.CheckState): The `Qt.CheckState` to apply (e.g.,
-            `Qt.CheckState.Checked`).
-        """
-        try:
-            self.file_table.itemChanged.disconnect(self._update_buttons_state)
-        except RuntimeError:
-            pass  # Ignore error if not connected
-
-        for i in range(self.file_table.rowCount()):
-            item = self.file_table.item(i, 0)
-            if item is not None:
-                item.setCheckState(state)
-
-        self.file_table.itemChanged.connect(self._update_buttons_state)
-        self._update_buttons_state()
-
-    def select_all(self):
-        """Selects all files in the table.
-
-        Checks all checkboxes in the file table and temporarily disables the UI.
-        """
-        self.setEnabled(False)
-        self._set_table_check_state(Qt.CheckState.Checked)
-        self.setEnabled(True)
-
-    def deselect_all(self):
-        """Deselects all files in the table.
-
-        Unchecks all checkboxes in the file table and temporarily disables the UI.
-        """
-        self.setEnabled(False)
-        self._set_table_check_state(Qt.CheckState.Unchecked)
-        self.setEnabled(True)
-
-    ############################################################################
-    # Conversion Control Methods
-    ############################################################################
-
-    def _validate_destination_directory(self):
-        """Validates and prepares the destination directory.
-
-        Checks if the destination directory is set and creates it if it doesn't
-        exist.
-
-        Returns:
-            str or None: The absolute path of the destination directory, or None
-            if invalid or creation failed.
-        """
-        dest_dir = self.dest_line_edit.text()
-
-        if not dest_dir:
-            self.output_log.append("Destination directory not set.")
-            return None
-
-        if not os.path.isdir(dest_dir):
-            try:
-                os.makedirs(dest_dir)
-                self.output_log.append(f"Created destination directory: {dest_dir}")
-            except OSError as e:
-                self.output_log.append(f"Error creating destination directory: {e}")
-                return None
-
-        return dest_dir
-
-    def _get_selected_files(self):
-        """Gets a list of selected files for conversion.
-
-        Iterates through the file table and collects paths of checked Opus
-        files.
-
-        Returns:
-            list: A list of absolute paths to the selected Opus files.
-        """
-        files_to_convert = []
-        src_dir = self.src_line_edit.text()
-
-        for i in range(self.file_table.rowCount()):
-            check_item = self.file_table.item(i, 0)
-            if (
-                check_item is not None
-                and check_item.checkState() == Qt.CheckState.Checked
-            ):
-                filename_item = self.file_table.item(i, 1)
-                if filename_item is not None:
-                    filename = filename_item.text()
-                    files_to_convert.append(os.path.join(src_dir, filename))
-
-        return files_to_convert
-
-    def set_conversion_ui_state(self, is_converting):
-        """Updates UI state during conversion.
-
-        Enables or disables various UI widgets based on whether a conversion is
-        active.
-
-        Args:
-            is_converting (bool): A boolean indicating if a conversion is
-            currently in progress.
-        """
-        widgets_to_toggle = [
-            self.src_line_edit,
-            self.src_button,
-            self.refresh_button,
-            self.dest_line_edit,
-            self.dest_button,
-            self.file_table,
-            self.select_all_button,
-            self.deselect_all_button,
-            self.convert_button,
-        ]
-
-        for widget in widgets_to_toggle:
-            widget.setEnabled(not is_converting)
-
-        self.cancel_button.setEnabled(is_converting)
-
-    def _prepare_conversion_ui(self):
-        """Prepares the UI for conversion start.
-
-        Updates the UI state, resets the progress bar, and clears the output
-        log.
-        """
-        self.set_conversion_ui_state(True)
-        self.progress_bar.setValue(0)
-        self.output_log.clear()
-
-    def _setup_conversion_thread(self, files_to_convert, dest_dir):
-        """Sets up and configures the conversion thread.
-
-        Initializes the `ConversionThread` with files and destination, and
-        connects its signals.
-
-        Args:
-            files_to_convert (list): A list of absolute paths to Opus files to
-            convert. dest_dir (str): The absolute path to the destination
-            directory for MP3 files.
-        """
-        if self.conversion_thread and self.conversion_thread.isRunning():
-            self.conversion_thread.finished.disconnect(self.conversion_finished)
-
-        self.conversion_thread = ConversionThread(files_to_convert, dest_dir)
-        self.conversion_thread.progress.connect(self.progress_bar.setValue)
-        self.conversion_thread.output.connect(self.append_log)
-        self.conversion_thread.finished.connect(self.conversion_finished)
-
-    def start_conversion(self):
-        """Starts the conversion process.
-
-        Validates directories and selected files, then initiates the conversion
-        thread.
-        """
-        dest_dir = self._validate_destination_directory()
-        if not dest_dir:
-            return
-
-        files_to_convert = self._get_selected_files()
-        if not files_to_convert:
-            self.output_log.append("No files selected for conversion.")
-            return
-
-        self._prepare_conversion_ui()
-        self._setup_conversion_thread(files_to_convert, dest_dir)
-        if self.conversion_thread is not None:
-            self.conversion_thread.start()
-
-    def cancel_conversion(self):
-        """Cancels the ongoing conversion.
-
-        Signals the conversion thread to stop and updates the UI state.
-        """
-        if self.conversion_thread and self.conversion_thread.isRunning():
-            self.conversion_thread.stop()
-            self.output_log.append("Conversion cancelled.")
-            self.set_conversion_ui_state(False)
-
-    def conversion_finished(self):
-        """Handles conversion completion.
-
-        Logs a completion message and resets the UI state.
-        """
-        self.output_log.append("Conversion complete.")
-        self.set_conversion_ui_state(False)
-
-    ############################################################################
-    # Utility Methods
-    ############################################################################
-
-    def append_log(self, log_type: LogType, message: str):
-        """Appends a formatted log message to the output log.
-
-        Formats the message with the specified log type and color, then appends
-        it to the QTextEdit log.
-
-        Args:
-            log_type (LogType): The `LogType` enum member indicating the type of
-            log message. message (str): The raw string content of the log
-            message.
-        """
-        color = log_type.color
-        display_name = log_type.display_name
-
-        formatted_message = f"{display_name}: {message}"
-        escaped_message = self._escape_html(formatted_message)
-
-        self.output_log.append(f'<font color="{color}">{escaped_message}</font>')
-
-    def _escape_html(self, text):
-        """Escapes HTML special characters in text.
-
-        Converts characters like '&', '<', '>', and newline to their HTML
-        entities.
-
-        Args:
-            text (str): The input string to escape.
-
-        Returns:
-            str: The HTML-escaped string.
-        """
-        return (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br>")
-        )
-
-    def closeEvent(self, event):
-        """Overrides the close event to save window settings."""
-        self._save_settings()
-        event.accept()
-
-
-################################################################################
-
-
 class ConversionThread(QThread):
     """QThread for handling Opus to MP3 conversion in a separate thread.
 
@@ -875,6 +103,7 @@ class ConversionThread(QThread):
         self.dest_dir = dest_dir
         self.running = True
         self.completed_files = 0
+        self.total_files = len(files_to_convert)  # Store total count
         self.lock = threading.Lock()
 
     ############################################################################
@@ -963,10 +192,8 @@ class ConversionThread(QThread):
 
             with self.lock:
                 self.completed_files += 1
-                progress = int(
-                    (self.completed_files / len(self.files_to_convert)) * 100
-                )
-                self.progress.emit(progress)
+                # Emit the actual count (not percentage) since progress bar max is set to total files
+                self.progress.emit(self.completed_files)
         else:
             self.output.emit(
                 LogType.ERROR,
@@ -1520,6 +747,826 @@ class ConversionThread(QThread):
         Sets an internal flag to signal ongoing conversions to cease.
         """
         self.running = False
+
+
+################################################################################
+
+
+class OpusToMp3Converter(QWidget):
+    """Main application window for the Opus to MP3 Converter.
+
+    Provides the user interface for selecting files, managing conversions, and
+    displaying progress and output.
+    """
+
+    def __init__(self):
+        """Initializes the OpusToMp3Converter application window."""
+        super().__init__()
+        self.setWindowTitle("Opus to MP3 Converter")
+        self.setMinimumSize(600, 800)
+        self.conversion_thread = None
+        self._setup_ui()
+        self._apply_styles()
+        self._load_settings()
+
+    ############################################################################
+    # UI Setup Methods
+    ############################################################################
+
+    def _setup_ui(self):
+        """Initializes the user interface.
+
+        Sets up all the widgets and layouts for the main application window.
+        """
+        layout = QVBoxLayout(self)
+        self._setup_directory_controls(layout)
+        self._setup_file_table(layout)
+        self._setup_selection_buttons(layout)
+        self._setup_action_buttons(layout)
+        self._setup_output_log(layout)
+        self._setup_progress_bar(layout)
+
+    def _apply_styles(self):
+        """Applies CSS styles to the application.
+
+        Sets the stylesheet for the main application window.
+        """
+        self.setStyleSheet(
+            """
+            QWidget {
+                background-color: #f0f0f0;
+                color: #333;
+            }
+            QLineEdit, QTextEdit, QTableWidget {
+                background-color: #fff;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton {
+                background-color: #0078d7;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #005a9e;
+            }
+            QPushButton:pressed {
+                background-color: #004578;
+            }
+
+            QPushButton#convertButton,
+            QPushButton#cancelButton {
+                background-color: #FFD700;
+                color: #000;
+            }
+
+            QPushButton#convertButton:hover,
+            QPushButton#cancelButton:hover {
+                background-color: #d9b600;
+            }
+
+            QPushButton#convertButton:pressed,
+            QPushButton#cancelButton:pressed {
+                background-color: #b39500;
+            }
+
+            QPushButton:disabled,
+            QPushButton#convertButton:disabled,
+            QPushButton#cancelButton:disabled {
+                background-color: gray;
+                color: #f0f0f0;
+            }
+
+            QProgressBar {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+            }
+        """
+        )
+
+    def _setup_directory_controls(self, parent_layout: QVBoxLayout):
+        """Sets up source and destination directory controls.
+
+        Creates and arranges widgets for selecting source and destination
+        directories.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which these controls will be
+            added.
+        """
+        grid_layout = QGridLayout()
+
+        # Source directory controls
+        src_label = QLabel("Source:")
+        src_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.src_line_edit = QLineEdit()
+        self.src_line_edit.setPlaceholderText("Source Directory")
+        self.src_button = QPushButton("Browse")
+        self.src_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.src_button.clicked.connect(self.browse_source)
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_button.clicked.connect(self.refresh_files)
+
+        # Destination directory controls
+        dest_label = QLabel("Destination:")
+        dest_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.dest_line_edit = QLineEdit()
+        self.dest_line_edit.setPlaceholderText("Destination Directory")
+        self.dest_button = QPushButton("Browse")
+        self.dest_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dest_button.clicked.connect(self.browse_destination)
+        self.dest_refresh_button = QPushButton("Refresh")
+        self.dest_refresh_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dest_refresh_button.clicked.connect(self.refresh_destination)
+
+        # Add widgets to grid
+        grid_layout.addWidget(src_label, 0, 0)
+        grid_layout.addWidget(self.src_line_edit, 0, 1)
+        grid_layout.addWidget(self.src_button, 0, 2)
+        grid_layout.addWidget(self.refresh_button, 0, 3)
+        grid_layout.addWidget(dest_label, 1, 0)
+        grid_layout.addWidget(self.dest_line_edit, 1, 1)
+        grid_layout.addWidget(self.dest_button, 1, 2)
+        grid_layout.addWidget(self.dest_refresh_button, 1, 3)
+
+        parent_layout.addLayout(grid_layout)
+
+    def _setup_file_table(self, parent_layout: QVBoxLayout):
+        """Sets up the file table widget.
+
+        Configures the table for displaying Opus files and their conversion
+        status.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which the file table will be
+            added.
+        """
+        self.file_table = QTableWidget()
+        self.file_table.setColumnCount(3)
+        self.file_table.setHorizontalHeaderLabels(["Convert", "Filename", "Duration"])
+
+        # Configure header resize modes
+        header = self.file_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+
+        parent_layout.addWidget(self.file_table)
+
+    def _setup_selection_buttons(self, parent_layout: QVBoxLayout):
+        """Sets up file selection buttons.
+
+        Creates 'Select All' and 'Deselect All' buttons for managing file
+        selections.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which these buttons will be
+            added.
+        """
+        select_layout = QHBoxLayout()
+
+        self.select_all_button = QPushButton("Select All")
+        self.select_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.select_all_button.clicked.connect(self.select_all)
+        self.select_all_button.setEnabled(False)
+
+        self.deselect_all_button = QPushButton("Deselect All")
+        self.deselect_all_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.deselect_all_button.clicked.connect(self.deselect_all)
+        self.deselect_all_button.setEnabled(False)
+
+        select_layout.addWidget(self.select_all_button)
+        select_layout.addWidget(self.deselect_all_button)
+        parent_layout.addLayout(select_layout)
+
+    def _setup_action_buttons(self, parent_layout: QVBoxLayout):
+        """Sets up conversion action buttons.
+
+        Creates 'Convert' and 'Cancel' buttons for initiating and stopping
+        conversions.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which these buttons will be
+            added.
+        """
+        button_layout = QHBoxLayout()
+
+        self.convert_button = QPushButton("Convert")
+        self.convert_button.setObjectName("convertButton")
+        self.convert_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.convert_button.clicked.connect(self.start_conversion)
+        self.convert_button.setEnabled(False)
+
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setObjectName("cancelButton")
+        self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_button.clicked.connect(self.cancel_conversion)
+        self.cancel_button.setEnabled(False)
+
+        button_layout.addWidget(self.convert_button)
+        button_layout.addWidget(self.cancel_button)
+        parent_layout.addLayout(button_layout)
+
+    def _setup_progress_bar(self, parent_layout: QVBoxLayout):
+        """Sets up the progress bar.
+
+        Initializes the QProgressBar widget for displaying conversion progress.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which the progress bar will
+            be added.
+        """
+        self.progress_bar = QProgressBar()
+        parent_layout.addWidget(self.progress_bar)
+
+    def _setup_output_log(self, parent_layout: QVBoxLayout):
+        """Sets up the output log.
+
+        Initializes the QTextEdit widget for displaying conversion output and
+        messages.
+
+        Args:
+            parent_layout (QVBoxLayout): The layout to which the output log will be
+            added.
+        """
+        self.output_log = QTextEdit()
+        self.output_log.setReadOnly(True)
+        parent_layout.addWidget(self.output_log)
+
+    ############################################################################
+    # Configuration Methods
+    ############################################################################
+
+    def _load_settings(self):
+        """Loads window settings from the configuration file."""
+        config = configparser.ConfigParser()
+        config.read(CONFIG_FILE)
+
+        width = config.getint("MainWindow", "width", fallback=800)
+        height = config.getint("MainWindow", "height", fallback=600)
+        x_pos = config.getint("MainWindow", "x_pos", fallback=100)
+        y_pos = config.getint("MainWindow", "y_pos", fallback=100)
+
+        self.setGeometry(x_pos, y_pos, width, height)
+
+        # Load column widths
+        if config.has_section("ColumnWidths"):
+            header = self.file_table.horizontalHeader()
+            for i in range(self.file_table.columnCount()):
+                width = config.getint("ColumnWidths", f"column_{i}_width", fallback=-1)
+                if width != -1:
+                    header.resizeSection(i, width)
+
+    def _save_settings(self):
+        """Saves current window settings to the configuration file."""
+        config = configparser.ConfigParser()
+        # Read existing config to preserve other sections if they exist
+        config.read(CONFIG_FILE)
+
+        if "MainWindow" not in config:
+            config["MainWindow"] = {}
+
+        config["MainWindow"]["width"] = str(self.width())
+        config["MainWindow"]["height"] = str(self.height())
+        config["MainWindow"]["x_pos"] = str(self.x())
+        config["MainWindow"]["y_pos"] = str(self.y())
+
+        # Save column widths
+        if "ColumnWidths" not in config:
+            config["ColumnWidths"] = {}
+        header = self.file_table.horizontalHeader()
+        for i in range(self.file_table.columnCount()):
+            config["ColumnWidths"][f"column_{i}_width"] = str(header.sectionSize(i))
+
+        with open(CONFIG_FILE, "w") as config_file:
+            config.write(config_file)
+
+    ############################################################################
+    # File Management Methods
+    ############################################################################
+
+    def _validate_source_directory(self):
+        """Validates that the source directory exists.
+
+        Checks if the path in `src_line_edit` points to an existing directory.
+
+        Returns:
+            bool: True if the source directory is valid, False otherwise.
+        """
+        src_dir = self.src_line_edit.text()
+        if not os.path.isdir(src_dir):
+            self.append_log(
+                LogType.WARNING,
+                "Source directory not set. Please select a valid directory.",
+            )
+            return False
+        return True
+
+    def _get_opus_files(self, src_dir):
+        """Gets a list of Opus files in the specified directory.
+
+        Scans the given source directory for files ending with '.opus'.
+
+        Args:
+            src_dir (str): The absolute path to the source directory.
+
+        Returns:
+            list: A list of Opus filenames found in the directory.
+        """
+        try:
+            all_files = os.listdir(src_dir)
+            opus_files = []
+            total_files = len(all_files)
+
+            # Set up progress bar for file scanning
+            self.progress_bar.setValue(0)
+            self.progress_bar.setMaximum(total_files)
+            self.progress_bar.setFormat("Scanning files: %p%")
+
+            for i, filename in enumerate(all_files):
+                if filename.endswith(".opus"):
+                    opus_files.append(filename)
+
+                # Update progress every 10 files to avoid UI lag
+                if i % 10 == 0 or i == total_files - 1:
+                    self.progress_bar.setValue(i + 1)
+                    QApplication.processEvents()  # Keep UI responsive
+
+            # Reset progress bar format after scanning
+            self.progress_bar.setFormat("%p%")
+            self.progress_bar.setValue(0)
+
+            return opus_files
+        except FileNotFoundError:
+            self.output_log.append(f"Source directory not found: {src_dir}")
+            self.progress_bar.setValue(0)
+            return []
+
+    def _add_file_to_table(self, row, opus_file, src_dir):
+        """Adds a file to the file table.
+
+        Inserts a new row into the file table with a checkbox, filename, and
+        duration.
+
+        Args:
+            row (int): The row index where the file should be added. opus_file
+            (str): The filename of the Opus file. src_dir (str): The source
+            directory of the Opus file.
+        """
+        self.file_table.insertRow(row)
+
+        # Create checkbox item
+        check_item = QTableWidgetItem()
+        check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+        check_item.setCheckState(Qt.CheckState.Checked)
+
+        # Create filename item
+        file_item = QTableWidgetItem(opus_file)
+        file_item.setFlags(file_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+        # Create duration item
+        duration_str = self.get_duration_str(os.path.join(src_dir, opus_file))
+        duration_item = QTableWidgetItem(duration_str)
+        duration_item.setFlags(duration_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+        # Add items to table
+        self.file_table.setItem(row, 0, check_item)
+        self.file_table.setItem(row, 1, file_item)
+        self.file_table.setItem(row, 2, duration_item)
+
+    def get_duration_str(self, filepath):
+        """Gets the duration string for a media file using ffprobe.
+
+        Executes `ffprobe` to extract the duration of a given media file and
+        formats it as MM:SS.
+
+        Args:
+            filepath (str): The absolute path to the media file.
+
+        Returns:
+            str: A string representing the duration (MM:SS) or "--:--" if
+            duration cannot be determined.
+        """
+        command = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            filepath,
+        ]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            duration = float(result.stdout.strip())
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            return f"{minutes:02d}:{seconds:02d}"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return "--:--"
+
+    ############################################################################
+    # UI Interaction Methods
+    ############################################################################
+
+    def _get_existing_directory(self, title):
+        """Opens a directory dialog and returns the selected path.
+
+        Temporarily disables the main window while the dialog is open.
+
+        Args:
+            title (str): The title for the directory selection dialog.
+
+        Returns:
+            str: The absolute path of the selected directory, or an empty string
+            if cancelled.
+        """
+        self.setEnabled(False)
+        dir_path = QFileDialog.getExistingDirectory(self, title)
+        self.setEnabled(True)
+        return dir_path
+
+    def browse_source(self):
+        """Browses for the source directory.
+
+        Opens a directory selection dialog and updates the source path and file
+        list.
+        """
+        dir_path = self._get_existing_directory("Select Source Directory")
+        if dir_path:
+            self.src_line_edit.setText(dir_path)
+            self.refresh_files()
+
+    def browse_destination(self):
+        """Browsers for the destination directory.
+
+        Opens a directory selection dialog and updates the destination path.
+        """
+        dir_path = self._get_existing_directory("Select Destination Directory")
+        if dir_path:
+            self.dest_line_edit.setText(dir_path)
+            self.refresh_destination()
+
+    def refresh_destination(self):
+        """Refreshes the count of MP3 files in the destination directory.
+
+        Reads the current destination path and updates the log with the number
+        of MP3 files found, without opening a directory selection dialog.
+        """
+        dir_path = self.dest_line_edit.text()
+        if not dir_path:
+            self.append_log(
+                LogType.WARNING,
+                "Destination directory not set. Please select a valid directory.",
+            )
+            return
+
+        try:
+            mp3_files = [
+                f
+                for f in os.listdir(dir_path)
+                if f.endswith(".mp3") and not f.startswith(".")
+            ]
+            self.append_log(
+                LogType.INFO,
+                f"Found {len(mp3_files)} MP3 files in destination folder.",
+            )
+        except FileNotFoundError:
+            self.append_log(
+                LogType.ERROR, f"Destination directory not found: {dir_path}"
+            )
+
+    def refresh_files(self):
+        """Refreshes the list of Opus files in the source directory.
+
+        Clears the current file table and repopulates it with files from the
+        selected source directory.
+        """
+        self.setEnabled(False)
+
+        if not self._validate_source_directory():
+            self.setEnabled(True)
+            return
+
+        src_dir = self.src_line_edit.text()
+
+        try:
+            self.file_table.itemChanged.disconnect(self._update_buttons_state)
+        except RuntimeError:
+            pass  # Ignore error if not connected
+
+        self.file_table.setRowCount(0)
+
+        # Show scanning progress
+        self.append_log(LogType.INFO, "Scanning source folder for Opus files...")
+
+        opus_files = self._get_opus_files(src_dir)
+
+        self.append_log(
+            LogType.INFO, f"Found {len(opus_files)} Opus files in source folder."
+        )
+
+        # Update progress bar for table population
+        if opus_files:
+            self.progress_bar.setValue(0)
+            self.progress_bar.setMaximum(len(opus_files))
+            self.progress_bar.setFormat("Loading files: %p%")
+
+            for i, opus_file in enumerate(opus_files):
+                self._add_file_to_table(i, opus_file, src_dir)
+
+                # Update progress every 5 files to avoid UI lag
+                if i % 5 == 0 or i == len(opus_files) - 1:
+                    self.progress_bar.setValue(i + 1)
+                    QApplication.processEvents()  # Keep UI responsive
+
+            # Reset progress bar
+            self.progress_bar.setFormat("%p%")
+            self.progress_bar.setValue(0)
+
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+        self._update_buttons_state()
+
+        self.setEnabled(True)
+
+    def _update_buttons_state(self):
+        """Updates the enabled state of the buttons based on file selection.
+
+        - 'Convert' is enabled only if at least one file is checked.
+        - 'Select All' and 'Deselect All' are enabled if there are any files in
+          the table.
+        """
+        has_files = self.file_table.rowCount() > 0
+        has_selected_files = False
+
+        if has_files:
+            for i in range(self.file_table.rowCount()):
+                item = self.file_table.item(i, 0)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    has_selected_files = True
+                    break
+
+        self.convert_button.setEnabled(has_selected_files)
+        self.select_all_button.setEnabled(has_files)
+        self.deselect_all_button.setEnabled(has_files)
+
+    def _set_table_check_state(self, state):
+        """Sets the check state for all files in the table.
+
+        Iterates through all rows in the file table and sets the checkbox state.
+
+        Args:
+            state (Qt.CheckState): The `Qt.CheckState` to apply (e.g.,
+            `Qt.CheckState.Checked`).
+        """
+        try:
+            self.file_table.itemChanged.disconnect(self._update_buttons_state)
+        except RuntimeError:
+            pass  # Ignore error if not connected
+
+        for i in range(self.file_table.rowCount()):
+            item = self.file_table.item(i, 0)
+            if item is not None:
+                item.setCheckState(state)
+
+        self.file_table.itemChanged.connect(self._update_buttons_state)
+        self._update_buttons_state()
+
+    def select_all(self):
+        """Selects all files in the table.
+
+        Checks all checkboxes in the file table and temporarily disables the UI.
+        """
+        self.setEnabled(False)
+        self._set_table_check_state(Qt.CheckState.Checked)
+        self.setEnabled(True)
+
+    def deselect_all(self):
+        """Deselects all files in the table.
+
+        Unchecks all checkboxes in the file table and temporarily disables the UI.
+        """
+        self.setEnabled(False)
+        self._set_table_check_state(Qt.CheckState.Unchecked)
+        self.setEnabled(True)
+
+    ############################################################################
+    # Conversion Control Methods
+    ############################################################################
+
+    def _validate_destination_directory(self):
+        """Validates and prepares the destination directory.
+
+        Checks if the destination directory is set and creates it if it doesn't
+        exist.
+
+        Returns:
+            str or None: The absolute path of the destination directory, or None
+            if invalid or creation failed.
+        """
+        dest_dir = self.dest_line_edit.text()
+
+        if not dest_dir:
+            self.output_log.append("Destination directory not set.")
+            return None
+
+        if not os.path.isdir(dest_dir):
+            try:
+                os.makedirs(dest_dir)
+                self.output_log.append(f"Created destination directory: {dest_dir}")
+            except OSError as e:
+                self.output_log.append(f"Error creating destination directory: {e}")
+                return None
+
+        return dest_dir
+
+    def _get_selected_files(self):
+        """Gets a list of selected files for conversion.
+
+        Iterates through the file table and collects paths of checked Opus
+        files.
+
+        Returns:
+            list: A list of absolute paths to the selected Opus files.
+        """
+        files_to_convert = []
+        src_dir = self.src_line_edit.text()
+
+        for i in range(self.file_table.rowCount()):
+            check_item = self.file_table.item(i, 0)
+            if (
+                check_item is not None
+                and check_item.checkState() == Qt.CheckState.Checked
+            ):
+                filename_item = self.file_table.item(i, 1)
+                if filename_item is not None:
+                    filename = filename_item.text()
+                    files_to_convert.append(os.path.join(src_dir, filename))
+
+        return files_to_convert
+
+    def set_conversion_ui_state(self, is_converting):
+        """Updates UI state during conversion.
+
+        Enables or disables various UI widgets based on whether a conversion is
+        active.
+
+        Args:
+            is_converting (bool): A boolean indicating if a conversion is
+            currently in progress.
+        """
+        widgets_to_toggle = [
+            self.src_line_edit,
+            self.src_button,
+            self.refresh_button,
+            self.dest_line_edit,
+            self.dest_button,
+            self.file_table,
+            self.select_all_button,
+            self.deselect_all_button,
+            self.convert_button,
+        ]
+
+        for widget in widgets_to_toggle:
+            widget.setEnabled(not is_converting)
+
+        self.cancel_button.setEnabled(is_converting)
+
+    def _prepare_conversion_ui(self, files_to_convert):
+        """Prepares the UI for conversion start.
+
+        Updates the UI state, resets the progress bar, and clears the output
+        log.
+
+        Args:
+            files_to_convert (list): List of files selected for conversion
+        """
+        self.set_conversion_ui_state(True)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(
+            len(files_to_convert)
+        )  # Set max to number of selected files
+        self.progress_bar.setFormat("%p%")  # Ensure format is reset
+        self.output_log.clear()
+
+    def _setup_conversion_thread(self, files_to_convert, dest_dir):
+        """Sets up and configures the conversion thread.
+
+        Initializes the `ConversionThread` with files and destination, and
+        connects its signals.
+
+        Args:
+            files_to_convert (list): A list of absolute paths to Opus files to
+            convert. dest_dir (str): The absolute path to the destination
+            directory for MP3 files.
+        """
+        if self.conversion_thread and self.conversion_thread.isRunning():
+            self.conversion_thread.finished.disconnect(self.conversion_finished)
+
+        self.conversion_thread = ConversionThread(files_to_convert, dest_dir)
+        self.conversion_thread.progress.connect(self.progress_bar.setValue)
+        self.conversion_thread.output.connect(self.append_log)
+        self.conversion_thread.finished.connect(self.conversion_finished)
+
+    def start_conversion(self):
+        """Starts the conversion process.
+
+        Validates directories and selected files, then initiates the conversion
+        thread.
+        """
+        dest_dir = self._validate_destination_directory()
+        if not dest_dir:
+            return
+
+        files_to_convert = self._get_selected_files()
+        if not files_to_convert:
+            self.output_log.append("No files selected for conversion.")
+            return
+
+        self._prepare_conversion_ui(files_to_convert)  # Pass files list
+        self._setup_conversion_thread(files_to_convert, dest_dir)
+        if self.conversion_thread is not None:
+            self.conversion_thread.start()
+
+    def cancel_conversion(self):
+        """Cancels the ongoing conversion.
+
+        Signals the conversion thread to stop and updates the UI state.
+        """
+        if self.conversion_thread and self.conversion_thread.isRunning():
+            self.conversion_thread.stop()
+            self.output_log.append("Conversion cancelled.")
+            self.set_conversion_ui_state(False)
+
+    def conversion_finished(self):
+        """Handles conversion completion.
+
+        Logs a completion message and resets the UI state.
+        """
+        self.output_log.append("Conversion complete.")
+        self.set_conversion_ui_state(False)
+
+    ############################################################################
+    # Utility Methods
+    ############################################################################
+
+    def append_log(self, log_type: LogType, message: str):
+        """Appends a formatted log message to the output log.
+
+        Formats the message with the specified log type and color, then appends
+        it to the QTextEdit log.
+
+        Args:
+            log_type (LogType): The `LogType` enum member indicating the type of
+            log message. message (str): The raw string content of the log
+            message.
+        """
+        color = log_type.color
+        display_name = log_type.display_name
+
+        formatted_message = f"{display_name}: {message}"
+        escaped_message = self._escape_html(formatted_message)
+
+        self.output_log.append(f'<font color="{color}">{escaped_message}</font>')
+
+    def _escape_html(self, text):
+        """Escapes HTML special characters in text.
+
+        Converts characters like '&', '<', '>', and newline to their HTML
+        entities.
+
+        Args:
+            text (str): The input string to escape.
+
+        Returns:
+            str: The HTML-escaped string.
+        """
+        return (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br>")
+        )
+
+    def closeEvent(self, event):
+        """Overrides the close event to save window settings."""
+        self._save_settings()
+        event.accept()
 
 
 ################################################################################
