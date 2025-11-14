@@ -20,3 +20,35 @@ The `opus2mp3` script is built using the following key technologies:
 - **FFmpeg:** An essential open-source multimedia framework used for handling the audio conversion from Opus to MP3 format.
 - **Python:** The core programming language for the application logic.
 
+## Installation
+
+To run this application, you need to have Python installed, along with the following dependencies. It is recommended to use a virtual environment.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/opus2mp3.git
+    cd opus2mp3
+    ```
+2.  **Create and activate a virtual environment (recommended):**
+    ```bash
+    python -m venv .venv
+    # On Windows
+    .venv\Scripts\activate
+    # On macOS/Linux
+    source .venv/bin/activate
+    ```
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Install FFmpeg:**
+    This application requires FFmpeg to be installed and accessible in your system's PATH. Please refer to the official FFmpeg website for installation instructions specific to your operating system.
+
+## How to Run
+
+After installing the dependencies, you can run the application using:
+```bash
+python opus2mp3.py
+```
+
+
