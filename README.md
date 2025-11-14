@@ -13,6 +13,8 @@ How it Works:
 The application leverages external libraries to perform the audio conversion. This includes a two-step pre-processing phase for each Opus file to normalize the music level, ensuring consistent playback volume. When you select Opus files and initiate the conversion, the script processes each file, transcodes the audio data from Opus to MP3, and saves the new MP3 files to your specified output directory.
 
 ![figure_01.png](docs/images/figure_01.png)
+![figure_02.png](docs/images/figure_02.png)
+![figure_03.png](docs/images/figure_03.png)
 
 ## Technologies Used
 The `opus2mp3` script is built using the following key technologies:
@@ -50,5 +52,8 @@ After installing the dependencies, you can run the application using:
 ```bash
 python opus2mp3.py
 ```
+
+## Disclaimer
+This software is intended for personal use only, for converting audio files that you have legally acquired. The developers of this software do not condone or support the illegal distribution or use of copyrighted material. Please ensure you have the necessary rights and permissions for any audio files you convert.
 
 
