@@ -1,5 +1,13 @@
 .gitignore
 
+__pycache__
+.pytest_cache
+.ruff_cache
 .venv
+.vscode
+
+*.cfg
+*.zip
 
 github-markdown.css
+
