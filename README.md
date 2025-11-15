@@ -1,16 +1,16 @@
-# opus2mp3
-GUI application that converts Opus audio files to MP3 format.
+# audio2mp3
+GUI application that converts Opus and MKA audio files to MP3 format.
 
-This script provides a user-friendly graphical interface for converting Opus audio files (.opus) into the more widely compatible MP3 format. It's designed for simplicity and efficiency, allowing users to easily select Opus files, convert them, and save them as MP3s with just a few clicks. The application handles the underlying conversion process, making it accessible even for users who are not familiar with command-line tools.
+This script provides a user-friendly graphical interface for converting Opus (.opus) and MKA (.mka) audio files into the more widely compatible MP3 format. It's designed for simplicity and efficiency, allowing users to easily select Opus files, convert them, and save them as MP3s with just a few clicks. The application handles the underlying conversion process, making it accessible even for users who are not familiar with command-line tools.
 
 Key Features:
-- **Batch Conversion:** Convert multiple Opus files to MP3 simultaneously.
+- **Batch Conversion:** Convert multiple Opus and MKA files to MP3 simultaneously.
 - **Intuitive GUI:** Easy-to-use interface for selecting files and managing conversions.
 - **Progress Tracking:** Monitor the conversion progress of each file.
 - **Error Handling:** Provides feedback on any conversion failures.
 
 How it Works:
-The application leverages external libraries to perform the audio conversion. This includes a two-step pre-processing phase for each Opus file to normalize the music level, ensuring consistent playback volume. When you select Opus files and initiate the conversion, the script processes each file, transcodes the audio data from Opus to MP3, and saves the new MP3 files to your specified output directory.
+The application leverages external libraries to perform the audio conversion. This includes a two-step pre-processing phase for each Opus file to normalize the music level, ensuring consistent playback volume. When you select audio files and initiate the conversion, the script processes each file, transcodes the audio data from Opus to MP3, and saves the new MP3 files to your specified output directory.
 
 ![figure_01.png](docs/images/figure_01.png)
 
@@ -19,7 +19,7 @@ The application leverages external libraries to perform the audio conversion. Th
 ![figure_03.png](docs/images/figure_03.png)
 
 ## Technologies Used
-The `opus2mp3` script is built using the following key technologies:
+The `audio2mp3` script is built using the following key technologies:
 - **PySide6:** For creating the graphical user interface, providing a modern and responsive experience.
 - **FFmpeg:** An essential open-source multimedia framework used for handling the audio conversion from Opus to MP3 format.
 - **Python:** The core programming language for the application logic.
@@ -30,8 +30,8 @@ To run this application, you need to have Python installed, along with the follo
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/opus2mp3.git
-    cd opus2mp3
+    git clone https://github.com/your-username/audio2mp3.git
+    cd audio2mp3
     ```
 2.  **Create and activate a virtual environment (recommended):**
     ```bash
@@ -52,7 +52,7 @@ To run this application, you need to have Python installed, along with the follo
 
 After installing the dependencies, you can run the application using:
 ```bash
-python opus2mp3.py
+python audio2mp3.py
 ```
 
 ## Disclaimer

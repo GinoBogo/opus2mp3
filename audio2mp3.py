@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 """
-Opus and MKA to MP3 Converter Application Author: Gino Bogo
+Audio to MP3 Converter Application
+
+Author: Gino Bogo
 
 This script provides a graphical user interface (GUI) application for converting
 Opus and MKA audio files to MP3 format. It utilizes FFmpeg for the conversion
@@ -10,8 +12,9 @@ application supports batch conversion, progress tracking, and logging of
 conversion events.
 """
 
-import configparser
+import base64
 import concurrent.futures
+import configparser
 import json
 import os
 import subprocess
@@ -19,15 +22,13 @@ import sys
 import threading
 from enum import Enum
 
-import base64
-from mutagen.id3 import ID3
 from mutagen._file import File
-from mutagen.id3._frames import APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK
+from mutagen.flac import Picture
+from mutagen.id3 import ID3
+from mutagen.id3._frames import APIC, TALB, TCON, TDRC, TPE1, TIT2, TRCK
 from mutagen.mp3 import MP3
 from mutagen.oggopus import OggOpus
-from mutagen.flac import Picture
-
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTableWidget,
@@ -45,7 +47,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-CONFIG_FILE = "opus2mp3.cfg"
+CONFIG_FILE = "audio2mp3.cfg"
 
 ################################################################################
 
@@ -874,7 +876,7 @@ class OpusToMp3Converter(QWidget):
     def __init__(self):
         """Initializes the OpusToMp3Converter application window."""
         super().__init__()
-        self.setWindowTitle("Opus and MKA to MP3 Converter")
+        self.setWindowTitle("Audio to MP3 Converter")
         self.setMinimumSize(600, 800)
         self.conversion_thread = None
         self._setup_ui()
@@ -1696,8 +1698,6 @@ def main():
         converter.show()
         sys.exit(app.exec())
     except Exception as e:
-        from PySide6.QtWidgets import QMessageBox
-
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setText("An unexpected error occurred")
